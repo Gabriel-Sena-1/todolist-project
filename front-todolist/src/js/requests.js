@@ -5,19 +5,15 @@ const api = axios.create({
 
 // Estados das tarefas com cores correspondentes
 const STATUS_COLORS = {
-    'ativo': 'primary',
-    'desativado': 'secondary',
-    'feito': 'success',
-    '2': 'warning'
+    'em andamento': 'primary',
+    'concluido': 'success'
 };
 
 // Função para formatar o status para exibição
 function formatStatus(status) {
     const statusMap = {
-        'ativo': 'Ativo',
-        'desativado': 'Desativado',
-        'feito': 'Concluído',
-        '2': 'Em Andamento'
+        'em andamento': 'Em andamento',
+        'concluido': 'Concluido'
     };
     return statusMap[status] || status;
 }
@@ -39,6 +35,9 @@ function createTaskElement(task) {
                 <button class="btn btn-outline-danger btn-sm" onclick="deleteTask('${task.id}')">
                     <i class="bi bi-trash"></i>
                 </button>
+                <button class="btn btn-outline-success btn-sm" onclick="updateTaskDone('${task.id}')">
+                    <i class="bi bi-check"></i>
+                </button>
             </div>
         </div>
     `;
@@ -53,7 +52,7 @@ async function getAllTasks() {
 
     try {
         const response = await api.get('/todo');
-        
+
         if (response.data.length === 0) {
             taskList.innerHTML = '<p class="text-center m-3">Nenhuma tarefa encontrada</p>';
             return;
@@ -73,7 +72,7 @@ async function loadTaskData(taskId) {
     try {
         const response = await api.get(`/todo/${taskId}`);
         const task = response.data;
-        
+
         const form = document.getElementById('taskForm');
         if (form) {
             form.title.value = task.title || '';
@@ -91,8 +90,7 @@ async function createTask(taskData) {
     try {
         await api.post('/todo', {
             title: taskData.title,
-            text: taskData.text,
-            status: taskData.status
+            text: taskData.text
         });
         window.location.href = 'index.html';
     } catch (error) {
@@ -101,15 +99,27 @@ async function createTask(taskData) {
     }
 }
 
-// Função para atualizar uma tarefa
+
 async function updateTask(taskId, updatedData) {
     try {
         await api.put(`/todo/${taskId}`, {
             title: updatedData.title,
-            text: updatedData.text,
-            status: updatedData.status
+            text: updatedData.text
         });
-        window.location.href = 'index.html';
+    } catch (error) {
+        console.error('Error updating task:', error);
+        throw error;
+    }
+}
+
+
+// Função para atualizar uma tarefa
+async function updateTaskDone(taskId) {
+    if (!confirm('Deseja marcar esta tarefa como concluída?')) return;
+
+    try {
+        await api.delete(`/todo/done/${taskId}`);
+        getAllTasks();
     } catch (error) {
         console.error('Erro ao atualizar tarefa:', error);
         showError('Erro ao atualizar tarefa');
@@ -129,9 +139,8 @@ async function deleteTask(taskId) {
     }
 }
 
-// Função para editar uma tarefa
 function editTask(taskId) {
-    window.location.href = `create-task.html?id=${taskId}`;
+    window.location.href = `update-task.html?id=${taskId}`;
 }
 
 // Função auxiliar para mostrar erros
@@ -144,38 +153,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const path = window.location.pathname;
     const isIndex = path.endsWith('index.html') || path.endsWith('/');
     const isCreateTask = path.endsWith('create-task.html');
-    
+
     // Carrega tarefas apenas na página index
     if (isIndex) {
         getAllTasks();
     }
-    
+
     // Configuração da página de criação/edição
     if (isCreateTask) {
         const urlParams = new URLSearchParams(window.location.search);
         const taskId = urlParams.get('id');
-        
+
         if (taskId) {
             loadTaskData(taskId);
         }
-        
+
         const form = document.getElementById('taskForm');
         if (form) {
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
-                
+
                 const formData = {
                     title: form.title.value.trim(),
-                    text: form.description.value.trim(),
-                    status: form.status.value
+                    text: form.description.value.trim()
                 };
 
-                if (taskId) {
-                    await updateTask(taskId, formData);
-                } else {
                     await createTask(formData);
-                }
             });
         }
     }
+
+
+    // Função para atualizar uma tarefa
+    const form = document.getElementById('updateTaskForm');
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const taskId = new URLSearchParams(window.location.search).get('id');
+        const title = document.getElementById('title').value;
+        const description = document.getElementById('description').value;
+
+        try {
+            await updateTask(taskId, { title, text: description });
+            window.location.href = 'index.html';
+        } catch (error) {
+            console.error('Error updating task:', error);
+            alert('Error updating task');
+        }
+    });
 });
+
